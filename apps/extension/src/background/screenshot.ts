@@ -30,7 +30,14 @@ export async function captureAndUpload(tabId: number, trigger: string): Promise<
 
   const tab = await chrome.tabs.get(tabId).catch(() => undefined);
   const url = tab?.url;
-  if (url && (await isUrlDenied(url))) return null;
+
+  // Only real web pages are worth capturing. A blank tab, the new tab page, an internal
+  // chrome page or an extension page yields a useless frame. Rejecting them BEFORE the
+  // throttle matters: a tab activation fires before its navigation, so letting a blank
+  // tab consume the interval budget silently drops the capture for the page the user
+  // actually navigated to.
+  if (!url || !/^https?:\/\//i.test(url)) return null;
+  if (await isUrlDenied(url)) return null;
 
   const now = Date.now();
   if (now - lastCaptureAt < SCREENSHOT_LIMITS.minIntervalMs) return null;
@@ -89,19 +96,23 @@ export async function captureAndUpload(tabId: number, trigger: string): Promise<
   }
   const signed = screenshotSignResponseSchema.parse(await signResponse.json());
 
-  const putResponse = await fetch(signed.uploadUrl, {
-    method: 'PUT',
-    credentials: 'omit',
-    headers: { 'Content-Type': 'image/webp' },
-    body: encodedBlob,
-  });
-  if (!putResponse.ok) {
-    console.error('[contextlens] screenshot upload failed', {
-      tabId,
-      trigger,
-      status: putResponse.status,
+  // Identical bytes may already be stored, since the object name is the content hash.
+  // Skipping the upload is the point of addressing by content, not a failure path.
+  if (!signed.alreadyStored && signed.uploadUrl) {
+    const putResponse = await fetch(signed.uploadUrl, {
+      method: 'PUT',
+      credentials: 'omit',
+      headers: { 'Content-Type': 'image/webp' },
+      body: encodedBlob,
     });
-    return null;
+    if (!putResponse.ok) {
+      console.error('[contextlens] screenshot upload failed', {
+        tabId,
+        trigger,
+        status: putResponse.status,
+      });
+      return null;
+    }
   }
 
   const payload = eventPayloadSchemas.screenshot.parse({

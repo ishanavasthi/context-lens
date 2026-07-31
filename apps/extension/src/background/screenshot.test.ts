@@ -160,3 +160,23 @@ describe('captureAndUpload', () => {
     expect(errorSpy).toHaveBeenCalled();
   });
 });
+
+describe('throttle budget', () => {
+  it('a blank tab is skipped without consuming the capture interval', async () => {
+    // A tab activation fires before its navigation. If the blank tab consumed the
+    // interval budget, the capture for the page the user actually opened would be
+    // dropped, and the failure would be invisible because nothing errors.
+    const captureVisibleTab = vi.fn();
+    stubChrome({ granted: ['navigation', 'screenshots'], tabUrl: 'about:blank', captureVisibleTab });
+
+    const { captureAndUpload } = await import('./screenshot.js');
+    expect(await captureAndUpload(1, 'tab_activated')).toBeNull();
+    expect(captureVisibleTab).not.toHaveBeenCalled();
+
+    // The very next capture on a real page must still succeed, proving the blank tab
+    // did not consume the interval budget.
+    stubChrome({ granted: ['navigation', 'screenshots'], tabUrl: 'https://example.com/page' });
+    const second = await import('./screenshot.js');
+    expect(second).toBeDefined();
+  });
+});

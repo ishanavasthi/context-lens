@@ -1,6 +1,13 @@
 import path from 'node:path';
 import { defineConfig } from '@playwright/test';
 
+// The screenshot tests read stored objects directly, which needs the storage credentials.
+try {
+  process.loadEnvFile(path.resolve(import.meta.dirname, '../../.env'));
+} catch {
+  // No .env present.
+}
+
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 
 export default defineConfig({

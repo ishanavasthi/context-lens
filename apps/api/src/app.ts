@@ -147,22 +147,37 @@ export function createApp(
     const day = new Date().toISOString().slice(0, 10);
     const storagePath = `${userId}/${day}/${input.sha256}.webp`;
 
-    const signRes = await fetch(
-      `${config.SUPABASE_URL}/storage/v1/object/upload/sign/${SCREENSHOT_BUCKET}/${storagePath}`,
-      {
-        method: 'POST',
-        headers: {
-          apikey: config.SUPABASE_SERVICE_ROLE_KEY,
-          authorization: `Bearer ${config.SUPABASE_SERVICE_ROLE_KEY}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({}),
-      },
+    const storageHeaders = {
+      apikey: config.SUPABASE_SERVICE_ROLE_KEY,
+      authorization: `Bearer ${config.SUPABASE_SERVICE_ROLE_KEY}`,
+    };
+
+    // Object names are content hashes, so an unchanged page resolves to a path that may
+    // already hold identical bytes. Storage refuses to sign over an existing object, and
+    // treating that refusal as an error would drop the event, leaving a page unrecorded
+    // precisely because nothing about it had changed. Probe first and skip the upload.
+    const probe = await fetch(
+      `${config.SUPABASE_URL}/storage/v1/object/info/${SCREENSHOT_BUCKET}/${storagePath}`,
+      { headers: storageHeaders },
     );
-    if (!signRes.ok) {
-      throw new ApiError(ERROR_CODES.INTERNAL, 'Failed to sign upload URL');
+    const alreadyStored = probe.ok;
+
+    let uploadUrl: string | null = null;
+    if (!alreadyStored) {
+      const signRes = await fetch(
+        `${config.SUPABASE_URL}/storage/v1/object/upload/sign/${SCREENSHOT_BUCKET}/${storagePath}`,
+        {
+          method: 'POST',
+          headers: { ...storageHeaders, 'content-type': 'application/json' },
+          body: JSON.stringify({}),
+        },
+      );
+      if (!signRes.ok) {
+        throw new ApiError(ERROR_CODES.INTERNAL, 'Failed to sign upload URL');
+      }
+      const signed = (await signRes.json()) as { url: string; token: string };
+      uploadUrl = `${config.SUPABASE_URL}/storage/v1${signed.url}`;
     }
-    const signed = (await signRes.json()) as { url: string; token: string };
 
     await insertScreenshot(pool, {
       screenshotId: input.sha256,
@@ -177,9 +192,10 @@ export function createApp(
 
     return c.json(
       screenshotSignResponseSchema.parse({
-        uploadUrl: `${config.SUPABASE_URL}/storage/v1${signed.url}`,
+        uploadUrl,
         storagePath,
         contentType: 'image/webp',
+        alreadyStored,
       }),
     );
   });

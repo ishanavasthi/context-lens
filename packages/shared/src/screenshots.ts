@@ -32,12 +32,22 @@ export const screenshotSignRequestSchema = z.object({
 export type ScreenshotSignRequest = z.infer<typeof screenshotSignRequestSchema>;
 
 export const screenshotSignResponseSchema = z.object({
-  /** Absolute URL the client PUTs the image to. Carries its own short lived token. */
-  uploadUrl: z.string().url(),
-  /** Where the object will live. Recorded on the screenshot event. */
+  /**
+   * Absolute URL the client PUTs the image to, carrying its own short lived token.
+   * Null when the object is already stored, in which case there is nothing to upload.
+   */
+  uploadUrl: z.string().url().nullable(),
+  /** Where the object lives. Recorded on the screenshot event either way. */
   storagePath: z.string().min(1),
   /** Content type the client must send, so the bucket's restriction is satisfied. */
   contentType: z.literal('image/webp'),
+  /**
+   * True when identical bytes are already in storage. Object names are content hashes,
+   * so re-capturing an unchanged page is a no op rather than a second upload. Treating
+   * this as an error would drop the event entirely, and the page would go unrecorded
+   * precisely because nothing about it had changed.
+   */
+  alreadyStored: z.boolean(),
 });
 
 export type ScreenshotSignResponse = z.infer<typeof screenshotSignResponseSchema>;
