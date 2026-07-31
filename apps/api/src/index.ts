@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { serve } from '@hono/node-server';
 import { Pool } from 'pg';
+import { connectionConfig, describeTarget } from '@contextlens/db';
 import { loadConfig } from './config.js';
 import { createApp } from './app.js';
 
@@ -22,7 +23,10 @@ const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-
 };
 
 const config = loadConfig();
-const pool = new Pool({ connectionString: config.DATABASE_URL });
+// TLS is required by hosted providers and unavailable on the local Docker instance,
+// so the mode is derived from the host rather than hand configured per environment.
+const pool = new Pool(connectionConfig(config.DATABASE_URL));
+console.log(JSON.stringify({ level: 'info', msg: 'database target', target: describeTarget(config.DATABASE_URL) }));
 const app = createApp(config, pkg.version, pool);
 
 serve({ fetch: app.fetch, port: config.PORT }, (info) => {

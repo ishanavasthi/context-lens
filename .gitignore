@@ -1,7 +1,12 @@
-# Agent and planning artifacts (kept local, never committed)
+# Agent and planning artifacts (kept local, never committed).
+# Anything that records how the work was produced, rather than how the software
+# works, belongs here and lives under .plans/ or .docs/ instead of the tree.
 CLAUDE.md
 PLAN.md
+DECISIONS.md
 .plans/
+.docs/
+docs/
 .claude/
 .mcp.json
 

@@ -2,17 +2,18 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import { connectionConfig, describeTarget, loadRootEnv } from '../connection.js';
 
 const { Client } = pg;
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ?? 'postgresql://contextlens:contextlens@localhost:54329/contextlens';
+loadRootEnv();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.join(__dirname, '..', 'migrations');
 
 async function main() {
-  const client = new Client({ connectionString: DATABASE_URL });
+  console.log(`migrating ${describeTarget()}`);
+  const client = new Client(connectionConfig());
   await client.connect();
 
   try {

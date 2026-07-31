@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import pg from 'pg';
+import { connectionConfig, describeTarget, loadRootEnv } from '../connection.js';
 
 const { Client } = pg;
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ?? 'postgresql://contextlens:contextlens@localhost:54329/contextlens';
+loadRootEnv();
 
 function urlHash(url) {
   return createHash('sha256').update(url).digest();
@@ -195,7 +195,8 @@ function buildEventsForSession(session, urlIds) {
 }
 
 async function main() {
-  const client = new Client({ connectionString: DATABASE_URL });
+  console.log(`seeding ${describeTarget()}`);
+  const client = new Client(connectionConfig());
   await client.connect();
 
   try {

@@ -35,7 +35,6 @@ and select `apps/extension/dist`.
 | `packages/shared` | Contracts shared by both sides: event schema, error envelope, route constants. |
 | `packages/db` | SQL migrations and the seed script. |
 | `tests/e2e` | Playwright suite that loads the built extension into real Chrome. |
-| `docs/adr` | One record per architectural decision that is expensive to reverse. |
 
 ## Testing
 
