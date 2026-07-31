@@ -10,9 +10,12 @@ import {
 } from '@contextlens/shared';
 import { onConsentChanged, readConsent } from '../consent/store.js';
 import { isUrlDenied } from '../privacy/deny.js';
+import { readPrivacySettings } from '../privacy/settings.js';
 import { applyBadge } from './badge.js';
+import { appendDelivery } from './delivery-log.js';
 import { registerObservers } from './observers.js';
 import { deleteEvents, enqueueEvent, queueSize, readBatch } from './queue.js';
+import { purgeLocalEvents } from './retention.js';
 import { captureAndUpload } from './screenshot.js';
 import { allocateEventIdentity, currentSessionId, getDeviceId } from './session.js';
 
@@ -60,11 +63,19 @@ async function flush(): Promise<void> {
   if (!isCapturing(await readConsent())) {
     return;
   }
-  const deviceId = await getDeviceId();
   const batch = await readBatch(MAX_EVENTS_PER_BATCH);
   if (batch.length === 0) {
     return;
   }
+  // The flush boundary: the last point before the fetch. Local only mode must hold
+  // even if some other code path calls flush directly, so it is checked here rather
+  // than at the point where events are queued.
+  const settings = await readPrivacySettings();
+  if (settings.localOnly) {
+    return;
+  }
+  const deviceId = await getDeviceId();
+  const types = [...new Set(batch.map((event) => event.type))];
   try {
     const response = await fetch(`${API_BASE}${ROUTES.eventsBatch}`, {
       method: 'POST',
@@ -74,11 +85,25 @@ async function flush(): Promise<void> {
       },
       body: JSON.stringify({ device_id: deviceId, session_id: await currentSessionId(), events: batch }),
     });
+    await appendDelivery({
+      at: Date.now(),
+      eventCount: batch.length,
+      types,
+      ok: response.ok,
+      status: response.status,
+    });
     if (response.ok) {
       await deleteEvents(batch.map((event) => event.event_id));
     }
-  } catch {
+  } catch (error) {
     // Leave the rows in place, the next alarm tick retries them.
+    await appendDelivery({
+      at: Date.now(),
+      eventCount: batch.length,
+      types,
+      ok: false,
+      detail: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
@@ -103,6 +128,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_NAME) {
     void flush();
+    void (async () => {
+      const settings = await readPrivacySettings();
+      await purgeLocalEvents(settings.retentionDays);
+    })();
   }
 });
 

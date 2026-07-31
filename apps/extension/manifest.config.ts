@@ -22,4 +22,10 @@ export default defineManifest({
     default_popup: 'src/popup/index.html',
   },
   options_page: 'src/options/index.html',
+  web_accessible_resources: [
+    {
+      resources: ['src/transparency/index.html'],
+      matches: ['<all_urls>'],
+    },
+  ],
 });

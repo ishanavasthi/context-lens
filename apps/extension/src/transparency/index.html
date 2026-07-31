@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ContextLens Transparency Log</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        color: #1a1a1a;
+      }
+      h1 {
+        font-size: 1.4rem;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0.5rem;
+        border-bottom: 1px solid #ddd;
+        font-size: 0.9rem;
+      }
+      .status-ok {
+        color: #15803d;
+      }
+      .status-fail {
+        color: #b91c1c;
+      }
+      .empty-state {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 1rem;
+        background: #f9fafb;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="app"></main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
