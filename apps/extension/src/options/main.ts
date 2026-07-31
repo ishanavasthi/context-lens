@@ -6,6 +6,7 @@ import {
   type ConsentScope,
 } from '@contextlens/shared';
 import { grantScopes, markOnboarded, readConsent, revokeScopes } from '../consent/store.js';
+import { renderPrivacyControls } from './privacy-controls.js';
 
 const SCOPE_DESCRIPTIONS: Record<ConsentScope, string> = {
   navigation: 'Records the pages you navigate to, such as the URL you land on and the page title.',
@@ -264,6 +265,8 @@ async function renderSettings(app: HTMLElement): Promise<void> {
   denySection.appendChild(saveButton);
 
   app.appendChild(denySection);
+
+  await renderPrivacyControls(app);
 }
 
 async function renderApp(): Promise<void> {
