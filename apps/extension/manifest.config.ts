@@ -27,5 +27,9 @@ export default defineManifest({
       resources: ['src/transparency/index.html'],
       matches: ['<all_urls>'],
     },
+    {
+      resources: ['src/timeline/index.html'],
+      matches: ['<all_urls>'],
+    },
   ],
 });
