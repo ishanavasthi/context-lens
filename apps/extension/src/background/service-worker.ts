@@ -11,6 +11,7 @@ import {
 import { onConsentChanged, readConsent } from '../consent/store.js';
 import { isUrlDenied } from '../privacy/deny.js';
 import { applyBadge } from './badge.js';
+import { registerObservers } from './observers.js';
 import { deleteEvents, enqueueEvent, queueSize, readBatch } from './queue.js';
 import { createSessionId, getDeviceId, nextSeq } from './session.js';
 
@@ -19,7 +20,7 @@ const FLUSH_QUEUE_THRESHOLD = 20;
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
 const DEVICE_TOKEN = import.meta.env.VITE_DEV_DEVICE_TOKEN;
 
-const sessionId = createSessionId();
+export const sessionId = createSessionId();
 
 async function enqueueIncomingEvents(
   events: PendingEvent[],
@@ -118,6 +119,8 @@ void readConsent().then(applyBadge);
 onConsentChanged((state) => {
   void applyBadge(state);
 });
+
+registerObservers();
 
 declare global {
   var __contextlens: {
