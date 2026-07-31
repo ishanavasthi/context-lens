@@ -118,7 +118,6 @@ onConsentChanged((state) => {
 });
 
 declare global {
-  // eslint-disable-next-line no-var
   var __contextlens: {
     queueSize: () => Promise<number>;
     flushNow: () => Promise<void>;

@@ -1,3 +1,4 @@
+import type { Worker } from '@playwright/test';
 import { STORAGE_KEYS, type ConsentState } from '@contextlens/shared';
 import { test, expect } from '../fixtures/extension.js';
 
@@ -19,7 +20,7 @@ const FIXTURE = 'http://localhost:5599/click-target.html';
 const DEV_TOKEN = 'dev-device-token-0000000000000000';
 
 async function setConsent(
-  serviceWorker: import('@playwright/test').Worker,
+  serviceWorker: Worker,
   granted: ConsentState['granted'],
 ): Promise<void> {
   const state: ConsentState = { granted, onboarded: true, paused: false, updatedAt: 0 };

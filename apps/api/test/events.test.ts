@@ -1,9 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
+import { connectionConfig, loadRootEnv } from '@contextlens/db';
 import { errorEnvelopeSchema } from '@contextlens/shared';
 import { createApp } from '../src/app.js';
 
+// Load the root env so the tests run against whatever database the rest of the
+// stack is pointed at. Without this they silently fall back to local Docker and a
+// green run says nothing about the database actually in use.
+loadRootEnv();
 const DATABASE_URL =
   process.env.DATABASE_URL ?? 'postgresql://contextlens:contextlens@localhost:54329/contextlens';
 
@@ -11,7 +16,7 @@ const DEVICE_TOKEN = 'dev-device-token-0000000000000000';
 const DEVICE_ID = '00000000-0000-4000-8000-000000000001';
 const USER_ID = '00000000-0000-0000-0000-000000000001';
 
-const pool = new Pool({ connectionString: DATABASE_URL });
+const pool = new Pool(connectionConfig(DATABASE_URL));
 const app = createApp({ PORT: 8787, NODE_ENV: 'test', LOG_LEVEL: 'error', DATABASE_URL }, '0.1.0', pool);
 
 const sessionId = randomUUID();

@@ -1,3 +1,4 @@
+import type { Worker } from '@playwright/test';
 import { INDICATOR, STORAGE_KEYS, type ConsentState } from '@contextlens/shared';
 import { test, expect } from '../fixtures/extension.js';
 
@@ -5,7 +6,7 @@ const FIXTURE = 'http://localhost:5599/click-target.html';
 const API_BATCH_URL = 'http://localhost:8787/v1/events:batch';
 
 async function setConsent(
-  serviceWorker: import('@playwright/test').Worker,
+  serviceWorker: Worker,
   granted: ConsentState['granted'],
   paused = false,
 ): Promise<void> {
@@ -17,7 +18,7 @@ async function setConsent(
 }
 
 async function setDenyList(
-  serviceWorker: import('@playwright/test').Worker,
+  serviceWorker: Worker,
   patterns: string[],
 ): Promise<void> {
   await serviceWorker.evaluate(
