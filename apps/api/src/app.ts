@@ -11,12 +11,16 @@ import {
   parseEvent,
   REQUEST_ID_HEADER,
   ROUTES,
+  screenshotSignRequestSchema,
+  screenshotSignResponseSchema,
+  SCREENSHOT_BUCKET,
   toErrorEnvelope,
 } from '@contextlens/shared';
 import type { Config } from './config.js';
 import { createLogger, type Logger } from './logger.js';
 import { deviceAuth, type AuthVariables } from './auth.js';
 import { insertEventsBatch, listEvents } from './repo/events.js';
+import { insertScreenshot } from './repo/screenshots.js';
 import { ensureSession } from './repo/sessions.js';
 import { decodeCursor, encodeCursor } from './cursor.js';
 
@@ -127,6 +131,57 @@ export function createApp(
         : null;
 
     return c.json({ events, nextCursor });
+  });
+
+  app.post(ROUTES.screenshotsSign, deviceAuth(pool), async (c) => {
+    if (!config.SUPABASE_URL || !config.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new ApiError(ERROR_CODES.INTERNAL, 'Screenshot storage is not configured');
+    }
+
+    const body = await c.req.json().catch(() => {
+      throw new ApiError(ERROR_CODES.BAD_REQUEST, 'Invalid JSON body');
+    });
+    const input = screenshotSignRequestSchema.parse(body);
+    const userId = c.get('userId');
+
+    const day = new Date().toISOString().slice(0, 10);
+    const storagePath = `${userId}/${day}/${input.sha256}.webp`;
+
+    const signRes = await fetch(
+      `${config.SUPABASE_URL}/storage/v1/object/upload/sign/${SCREENSHOT_BUCKET}/${storagePath}`,
+      {
+        method: 'POST',
+        headers: {
+          apikey: config.SUPABASE_SERVICE_ROLE_KEY,
+          authorization: `Bearer ${config.SUPABASE_SERVICE_ROLE_KEY}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      },
+    );
+    if (!signRes.ok) {
+      throw new ApiError(ERROR_CODES.INTERNAL, 'Failed to sign upload URL');
+    }
+    const signed = (await signRes.json()) as { url: string; token: string };
+
+    await insertScreenshot(pool, {
+      screenshotId: input.sha256,
+      userId,
+      storagePath,
+      width: input.width,
+      height: input.height,
+      dpr: input.dpr,
+      bytes: input.bytes,
+      sha256: Buffer.from(input.sha256, 'hex'),
+    });
+
+    return c.json(
+      screenshotSignResponseSchema.parse({
+        uploadUrl: `${config.SUPABASE_URL}/storage/v1${signed.url}`,
+        storagePath,
+        contentType: 'image/webp',
+      }),
+    );
   });
 
   app.notFound((c) => {
