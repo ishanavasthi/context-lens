@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
 import type { EventEnvelope } from '@contextlens/shared';
-import { normalizeUrl } from '../url.js';
+import { parseUrl } from '../url.js';
 import { upsertUrl } from './urls.js';
 
 export interface InsertEventsBatchResult {
@@ -21,8 +21,9 @@ export async function insertEventsBatch(
     for (const event of events) {
       let urlId: number | null = null;
       if (event.url) {
-        const hash = createHash('sha256').update(normalizeUrl(event.url)).digest();
-        urlId = await upsertUrl(client, hash);
+        const parts = parseUrl(event.url);
+        const hash = createHash('sha256').update(parts.normalized).digest();
+        urlId = await upsertUrl(client, hash, parts);
       }
 
       const result = await client.query(
