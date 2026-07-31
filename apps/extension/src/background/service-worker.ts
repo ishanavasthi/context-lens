@@ -1,10 +1,12 @@
-import { ROUTES, SCHEMA_VERSION, eventPayloadSchemas, MAX_EVENTS_PER_BATCH, type EventEnvelope } from '@contextlens/shared';
+import { ROUTES, SCHEMA_VERSION, eventPayloadSchemas, isCapturing, MAX_EVENTS_PER_BATCH, type EventEnvelope } from '@contextlens/shared';
+import { onConsentChanged, readConsent } from '../consent/store.js';
+import { isUrlDenied } from '../privacy/deny.js';
+import { applyBadge } from './badge.js';
 import { deleteEvents, enqueueEvent, queueSize, readBatch } from './queue.js';
 import { createSessionId, getDeviceId, nextSeq } from './session.js';
 
 const ALARM_NAME = 'contextlens-flush';
 const FLUSH_QUEUE_THRESHOLD = 20;
-const CAPTURE_ENABLED_KEY = 'captureEnabled';
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
 const DEVICE_TOKEN = import.meta.env.VITE_DEV_DEVICE_TOKEN;
 
@@ -19,17 +21,15 @@ type IncomingClickEvent = {
   payload: Record<string, unknown>;
 };
 
-async function isCaptureEnabled(): Promise<boolean> {
-  const stored = await chrome.storage.local.get(CAPTURE_ENABLED_KEY);
-  return stored[CAPTURE_ENABLED_KEY] === true;
-}
-
 async function enqueueIncomingEvents(
   events: IncomingClickEvent[],
   tabId: number | undefined,
 ): Promise<void> {
   const deviceId = await getDeviceId();
   for (const incoming of events) {
+    if (await isUrlDenied(incoming.url)) {
+      continue;
+    }
     const parsedPayload = eventPayloadSchemas.click.safeParse(incoming.payload);
     if (!parsedPayload.success) {
       continue;
@@ -53,7 +53,7 @@ async function enqueueIncomingEvents(
 }
 
 async function flush(): Promise<void> {
-  if (!(await isCaptureEnabled())) {
+  if (!isCapturing(await readConsent())) {
     return;
   }
   const deviceId = await getDeviceId();
@@ -83,7 +83,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return undefined;
   }
   void (async () => {
-    if (!(await isCaptureEnabled())) {
+    if (!isCapturing(await readConsent())) {
       sendResponse({ ok: false });
       return;
     }
@@ -111,6 +111,11 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 chrome.alarms.create(ALARM_NAME, { periodInMinutes: 1 });
+
+void readConsent().then(applyBadge);
+onConsentChanged((state) => {
+  void applyBadge(state);
+});
 
 declare global {
   // eslint-disable-next-line no-var

@@ -1,25 +1,68 @@
-const CAPTURE_ENABLED_KEY = 'captureEnabled';
+import { CONSENT_SCOPES, type ConsentState } from '@contextlens/shared';
+import { onConsentChanged, readConsent, setPaused } from '../consent/store.js';
 
-function render(button: HTMLButtonElement, enabled: boolean): void {
-  button.textContent = enabled ? 'Capture: on' : 'Capture: off';
+function scopeLabel(scope: string): string {
+  return scope.charAt(0).toUpperCase() + scope.slice(1);
+}
+
+function render(app: HTMLElement, state: ConsentState): void {
+  app.innerHTML = '';
+
+  const heading = document.createElement('h1');
+  heading.textContent = 'ContextLens';
+  app.appendChild(heading);
+
+  const scopesSection = document.createElement('section');
+  scopesSection.setAttribute('data-testid', 'popup-scopes');
+  const granted = CONSENT_SCOPES.filter((scope) => state.granted.includes(scope));
+  if (granted.length === 0) {
+    const none = document.createElement('p');
+    none.setAttribute('data-testid', 'popup-scopes-empty');
+    none.textContent = 'Nothing granted';
+    scopesSection.appendChild(none);
+  } else {
+    const list = document.createElement('ul');
+    for (const scope of granted) {
+      const item = document.createElement('li');
+      item.setAttribute('data-testid', `popup-scope-${scope}`);
+      item.textContent = scopeLabel(scope);
+      list.appendChild(item);
+    }
+    scopesSection.appendChild(list);
+  }
+  app.appendChild(scopesSection);
+
+  const status = document.createElement('p');
+  status.setAttribute('data-testid', 'popup-status');
+  status.textContent = state.paused ? 'Paused' : 'Active';
+  app.appendChild(status);
+
+  const pauseResumeButton = document.createElement('button');
+  pauseResumeButton.type = 'button';
+  pauseResumeButton.setAttribute('data-testid', 'popup-pause-resume');
+  pauseResumeButton.textContent = state.paused ? 'Resume' : 'Pause';
+  pauseResumeButton.addEventListener('click', () => {
+    void setPaused(!state.paused);
+  });
+  app.appendChild(pauseResumeButton);
+
+  const optionsButton = document.createElement('button');
+  optionsButton.type = 'button';
+  optionsButton.setAttribute('data-testid', 'popup-open-options');
+  optionsButton.textContent = 'Options';
+  optionsButton.addEventListener('click', () => {
+    chrome.runtime.openOptionsPage();
+  });
+  app.appendChild(optionsButton);
 }
 
 async function init(): Promise<void> {
-  const button = document.getElementById('toggle');
-  if (!(button instanceof HTMLButtonElement)) {
+  const app = document.getElementById('app');
+  if (!app) {
     return;
   }
-  const stored = await chrome.storage.local.get(CAPTURE_ENABLED_KEY);
-  let enabled = stored[CAPTURE_ENABLED_KEY] === true;
-  render(button, enabled);
-
-  button.addEventListener('click', () => {
-    void (async () => {
-      enabled = !enabled;
-      await chrome.storage.local.set({ [CAPTURE_ENABLED_KEY]: enabled });
-      render(button, enabled);
-    })();
-  });
+  render(app, await readConsent());
+  onConsentChanged((state) => render(app, state));
 }
 
 void init();

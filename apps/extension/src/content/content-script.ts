@@ -1,7 +1,10 @@
 import { ulid } from 'ulid';
+import { hasScope, isCapturing, type ConsentState } from '@contextlens/shared';
+import { onConsentChanged, readConsent } from '../consent/store.js';
+import { isUrlDenied } from '../privacy/deny.js';
+import { setIndicatorState } from './indicator.js';
 
 const FLUSH_INTERVAL_MS = 2000;
-const CAPTURE_ENABLED_KEY = 'captureEnabled';
 
 type PendingClickEvent = {
   event_id: string;
@@ -21,19 +24,32 @@ type PendingClickEvent = {
   };
 };
 
-let captureEnabled = false;
+let consentState: ConsentState | null = null;
+let pageDenied = false;
 let buffer: PendingClickEvent[] = [];
 
-async function loadCaptureEnabled(): Promise<void> {
-  const stored = await chrome.storage.local.get(CAPTURE_ENABLED_KEY);
-  captureEnabled = stored[CAPTURE_ENABLED_KEY] === true;
+function canCaptureClicks(): boolean {
+  return consentState !== null && !pageDenied && hasScope(consentState, 'interaction');
 }
 
-chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === 'local' && CAPTURE_ENABLED_KEY in changes) {
-    captureEnabled = changes[CAPTURE_ENABLED_KEY]?.newValue === true;
+function updateIndicator(): void {
+  if (!consentState) {
+    return;
   }
-});
+  if (pageDenied) {
+    setIndicatorState('hidden');
+    return;
+  }
+  if (consentState.paused) {
+    setIndicatorState('paused');
+    return;
+  }
+  if (isCapturing(consentState)) {
+    setIndicatorState('recording');
+    return;
+  }
+  setIndicatorState('hidden');
+}
 
 function buildSelectorPath(element: Element): string {
   const parts: string[] = [];
@@ -67,7 +83,7 @@ async function sha256Hex(text: string): Promise<string> {
 }
 
 async function handleClick(event: MouseEvent): Promise<void> {
-  if (!captureEnabled) {
+  if (!canCaptureClicks()) {
     return;
   }
   const target = event.target;
@@ -97,7 +113,7 @@ async function handleClick(event: MouseEvent): Promise<void> {
 }
 
 function flush(): void {
-  if (!captureEnabled || buffer.length === 0) {
+  if (buffer.length === 0) {
     return;
   }
   const events = buffer;
@@ -121,4 +137,15 @@ window.addEventListener('pagehide', flush);
 
 setInterval(flush, FLUSH_INTERVAL_MS);
 
-void loadCaptureEnabled();
+async function init(): Promise<void> {
+  pageDenied = await isUrlDenied(location.href);
+  consentState = await readConsent();
+  updateIndicator();
+}
+
+onConsentChanged((state) => {
+  consentState = state;
+  updateIndicator();
+});
+
+void init();
