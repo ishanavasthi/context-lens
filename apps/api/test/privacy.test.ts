@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import { connectionConfig, loadRootEnv } from '@contextlens/db';
 import { deleteResultSchema, errorEnvelopeSchema } from '@contextlens/shared';
