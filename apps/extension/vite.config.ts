@@ -11,5 +11,15 @@ export default defineConfig({
   plugins: [crx({ manifest })],
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      // Pages reachable only as web accessible resources are not discovered from the
+      // manifest the way the popup and options pages are, so without declaring them here
+      // Vite copies the HTML verbatim and its script tag still points at the TypeScript
+      // source. The page then loads and renders nothing, with no build error at all.
+      input: {
+        timeline: path.resolve(import.meta.dirname, 'src/timeline/index.html'),
+        transparency: path.resolve(import.meta.dirname, 'src/transparency/index.html'),
+      },
+    },
   },
 });
