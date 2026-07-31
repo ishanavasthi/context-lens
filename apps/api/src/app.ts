@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { Pool } from 'pg';
-import { ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 import {
   ApiError,
+  deleteResultSchema,
   ERROR_CODES,
   eventBatchResultSchema,
   eventBatchSchema,
@@ -20,9 +21,23 @@ import type { Config } from './config.js';
 import { createLogger, type Logger } from './logger.js';
 import { deviceAuth, type AuthVariables } from './auth.js';
 import { insertEventsBatch, listEvents } from './repo/events.js';
+import {
+  countUserData,
+  deleteAllUserData,
+  insertConsentAudit,
+  iterateEvents,
+  iterateScreenshots,
+  iterateSessions,
+} from './repo/privacy.js';
 import { insertScreenshot } from './repo/screenshots.js';
 import { ensureSession } from './repo/sessions.js';
 import { decodeCursor, encodeCursor } from './cursor.js';
+
+const consentRequestSchema = z.object({
+  from: z.array(z.string()),
+  to: z.array(z.string()),
+  source: z.string(),
+});
 
 type Variables = AuthVariables & {
   requestId: string;
@@ -198,6 +213,65 @@ export function createApp(
         alreadyStored,
       }),
     );
+  });
+
+  app.get(ROUTES.export, deviceAuth(pool), async (c) => {
+    const userId = c.get('userId');
+    const counts = await countUserData(pool, userId);
+    const exportedAt = new Date().toISOString();
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        const writeLine = (obj: unknown) => controller.enqueue(encoder.encode(`${JSON.stringify(obj)}\n`));
+
+        writeLine({ kind: 'meta', exported_at: exportedAt, user_id: userId, counts });
+        for await (const session of iterateSessions(pool, userId)) {
+          writeLine({ kind: 'session', ...session });
+        }
+        for await (const event of iterateEvents(pool, userId)) {
+          writeLine({ kind: 'event', ...event });
+        }
+        for await (const screenshot of iterateScreenshots(pool, userId)) {
+          writeLine({ kind: 'screenshot', ...screenshot });
+        }
+        controller.close();
+      },
+    });
+
+    return c.body(stream, 200, {
+      'content-type': 'application/x-ndjson',
+      'content-disposition': `attachment; filename="contextlens-export-${userId}.ndjson"`,
+    });
+  });
+
+  app.delete(ROUTES.data, deviceAuth(pool), async (c) => {
+    const userId = c.get('userId');
+    const result = await deleteAllUserData(pool, userId, {
+      supabaseUrl: config.SUPABASE_URL,
+      supabaseServiceRoleKey: config.SUPABASE_SERVICE_ROLE_KEY,
+      screenshotBucket: SCREENSHOT_BUCKET,
+    });
+    return c.json(deleteResultSchema.parse(result));
+  });
+
+  app.post(ROUTES.consent, deviceAuth(pool), async (c) => {
+    const body = await c.req.json().catch(() => {
+      throw new ApiError(ERROR_CODES.BAD_REQUEST, 'Invalid JSON body');
+    });
+    const input = consentRequestSchema.parse(body);
+    const userId = c.get('userId');
+    const deviceId = c.get('deviceId');
+
+    await insertConsentAudit(pool, {
+      userId,
+      deviceId,
+      from: input.from,
+      to: input.to,
+      source: input.source,
+    });
+
+    return c.json({ ok: true as const });
   });
 
   app.notFound((c) => {
