@@ -1,4 +1,13 @@
-import { ROUTES, SCHEMA_VERSION, eventPayloadSchemas, isCapturing, MAX_EVENTS_PER_BATCH, type EventEnvelope } from '@contextlens/shared';
+import {
+  CONTENT_EVENTS_MESSAGE,
+  eventPayloadSchemas,
+  isCapturing,
+  MAX_EVENTS_PER_BATCH,
+  ROUTES,
+  SCHEMA_VERSION,
+  type EventEnvelope,
+  type PendingEvent,
+} from '@contextlens/shared';
 import { onConsentChanged, readConsent } from '../consent/store.js';
 import { isUrlDenied } from '../privacy/deny.js';
 import { applyBadge } from './badge.js';
@@ -12,25 +21,18 @@ const DEVICE_TOKEN = import.meta.env.VITE_DEV_DEVICE_TOKEN;
 
 const sessionId = createSessionId();
 
-type IncomingClickEvent = {
-  event_id: string;
-  type: 'click';
-  ts: number;
-  tz_offset: number;
-  url: string;
-  payload: Record<string, unknown>;
-};
-
 async function enqueueIncomingEvents(
-  events: IncomingClickEvent[],
+  events: PendingEvent[],
   tabId: number | undefined,
 ): Promise<void> {
   const deviceId = await getDeviceId();
   for (const incoming of events) {
-    if (await isUrlDenied(incoming.url)) {
+    if (incoming.url && (await isUrlDenied(incoming.url))) {
       continue;
     }
-    const parsedPayload = eventPayloadSchemas.click.safeParse(incoming.payload);
+    // Validate against the schema for this event's own type. Hardcoding one type
+    // here would silently drop every other kind of event as malformed.
+    const parsedPayload = eventPayloadSchemas[incoming.type].safeParse(incoming.payload);
     if (!parsedPayload.success) {
       continue;
     }
@@ -39,7 +41,7 @@ async function enqueueIncomingEvents(
       event_id: incoming.event_id,
       session_id: sessionId,
       device_id: deviceId,
-      type: 'click',
+      type: incoming.type,
       ts: incoming.ts,
       tz_offset: incoming.tz_offset,
       seq,
@@ -79,7 +81,7 @@ async function flush(): Promise<void> {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== 'contextlens:click-events') {
+  if (message?.type !== CONTENT_EVENTS_MESSAGE) {
     return undefined;
   }
   void (async () => {
@@ -87,7 +89,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ ok: false });
       return;
     }
-    await enqueueIncomingEvents(message.events as IncomingClickEvent[], sender.tab?.id);
+    await enqueueIncomingEvents(message.events as PendingEvent[], sender.tab?.id);
     if ((await queueSize()) > FLUSH_QUEUE_THRESHOLD) {
       await flush();
     }

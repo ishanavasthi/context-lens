@@ -127,3 +127,23 @@ export const eventBatchResultSchema = z.object({
 });
 
 export type EventBatchResult = z.infer<typeof eventBatchResultSchema>;
+
+/**
+ * What a content script hands to the service worker. The content script knows the
+ * event id, the type and the payload; only the worker knows the session, the device
+ * and the sequence number, so it completes the envelope. Keeping seq assignment in
+ * one place is what makes gap detection meaningful.
+ */
+export const pendingEventSchema = z.object({
+  event_id: z.string().min(20).max(40),
+  type: z.enum(EVENT_TYPES),
+  ts: z.number().int().positive(),
+  tz_offset: z.number().int().min(-900).max(900),
+  url: z.string().optional(),
+  payload: z.record(z.unknown()).default({}),
+});
+
+export type PendingEvent = z.infer<typeof pendingEventSchema>;
+
+/** The single runtime message name carrying captured events to the worker. */
+export const CONTENT_EVENTS_MESSAGE = 'contextlens:events';

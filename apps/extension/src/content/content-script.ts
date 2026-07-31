@@ -1,5 +1,10 @@
 import { ulid } from 'ulid';
-import { hasScope, isCapturing, type ConsentState } from '@contextlens/shared';
+import {
+  CONTENT_EVENTS_MESSAGE,
+  hasScope,
+  isCapturing,
+  type ConsentState,
+} from '@contextlens/shared';
 import { onConsentChanged, readConsent } from '../consent/store.js';
 import { isUrlDenied } from '../privacy/deny.js';
 import { setIndicatorState } from './indicator.js';
@@ -118,7 +123,7 @@ function flush(): void {
   }
   const events = buffer;
   buffer = [];
-  chrome.runtime.sendMessage({ type: 'contextlens:click-events', events }).catch(() => {
+  chrome.runtime.sendMessage({ type: CONTENT_EVENTS_MESSAGE, events }).catch(() => {
     buffer = [...events, ...buffer];
   });
 }
