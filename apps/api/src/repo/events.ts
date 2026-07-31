@@ -72,36 +72,44 @@ export interface EventRow {
   tab_id: number | null;
   url_id: number | null;
   payload: unknown;
+  host: string | null;
+  path: string | null;
+  scheme: string | null;
 }
 
 export async function listEvents(pool: Pool, params: ListEventsParams): Promise<EventRow[]> {
-  const conditions = ['user_id = $1'];
+  const conditions = ['e.user_id = $1'];
   const values: unknown[] = [params.userId];
 
   if (params.type) {
     values.push(params.type);
-    conditions.push(`type = $${values.length}`);
+    conditions.push(`e.type = $${values.length}`);
   }
   if (params.from) {
     values.push(params.from);
-    conditions.push(`ts >= $${values.length}`);
+    conditions.push(`e.ts >= $${values.length}`);
   }
   if (params.to) {
     values.push(params.to);
-    conditions.push(`ts <= $${values.length}`);
+    conditions.push(`e.ts <= $${values.length}`);
   }
   if (params.cursor) {
     values.push(params.cursor.ts, params.cursor.eventId);
-    conditions.push(`(ts, event_id) < ($${values.length - 1}, $${values.length})`);
+    conditions.push(`(e.ts, e.event_id) < ($${values.length - 1}, $${values.length})`);
   }
 
   values.push(params.limit);
 
   const result = await pool.query(
-    `select event_id, session_id, type, ts, seq, tab_id, url_id, payload
-     from events
+    // Resolve the URL dimension here rather than returning the internal url_id. A client
+    // cannot do anything useful with a foreign key, and making every consumer perform its
+    // own lookup would push a join into the browser.
+    `select e.event_id, e.session_id, e.type, e.ts, e.seq, e.tab_id, e.url_id, e.payload,
+            u.host, u.path, u.scheme
+     from events e
+     left join urls u on u.url_id = e.url_id
      where ${conditions.join(' and ')}
-     order by ts desc, event_id desc
+     order by e.ts desc, e.event_id desc
      limit $${values.length}`,
     values,
   );
