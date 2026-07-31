@@ -1,3 +1,4 @@
+import { STORAGE_KEYS, type ConsentState } from '@contextlens/shared';
 import { test, expect } from '../fixtures/extension.js';
 
 /**
@@ -17,6 +18,17 @@ const FIXTURE = 'http://localhost:5599/click-target.html';
 // documented in .env.example.
 const DEV_TOKEN = 'dev-device-token-0000000000000000';
 
+async function setConsent(
+  serviceWorker: import('@playwright/test').Worker,
+  granted: ConsentState['granted'],
+): Promise<void> {
+  const state: ConsentState = { granted, onboarded: true, paused: false, updatedAt: 0 };
+  await serviceWorker.evaluate(
+    ({ key, value }) => chrome.storage.local.set({ [key]: value }),
+    { key: STORAGE_KEYS.consent, value: state },
+  );
+}
+
 async function readEvents(type: string) {
   const res = await fetch(`${API}/v1/events?type=${type}&limit=500`, {
     headers: { Authorization: `Bearer ${DEV_TOKEN}` },
@@ -31,9 +43,9 @@ test('a click travels from the page to Postgres and back out through the API', a
 }) => {
   const before = await readEvents('click');
 
-  // Consent is off by default, which is the whole point of the design. Turn it
-  // on explicitly, the way the popup toggle does.
-  await serviceWorker.evaluate(() => chrome.storage.local.set({ captureEnabled: true }));
+  // Consent is off by default, which is the whole point of the design. Grant it
+  // explicitly, the way the options page does.
+  await setConsent(serviceWorker, ['interaction']);
 
   const page = await context.newPage();
   await page.goto(FIXTURE, { waitUntil: 'load' });
@@ -76,7 +88,7 @@ test('a click travels from the page to Postgres and back out through the API', a
 });
 
 test('with consent off, clicking produces nothing', async ({ context, serviceWorker }) => {
-  await serviceWorker.evaluate(() => chrome.storage.local.set({ captureEnabled: false }));
+  await setConsent(serviceWorker, []);
 
   const page = await context.newPage();
   await page.goto(FIXTURE, { waitUntil: 'load' });
