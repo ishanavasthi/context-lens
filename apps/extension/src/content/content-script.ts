@@ -1,40 +1,41 @@
 import { ulid } from 'ulid';
 import {
   CONTENT_EVENTS_MESSAGE,
-  hasScope,
+  mayCapture,
   isCapturing,
   type ConsentState,
+  type EventType,
+  type PendingEvent,
 } from '@contextlens/shared';
 import { onConsentChanged, readConsent } from '../consent/store.js';
 import { isUrlDenied } from '../privacy/deny.js';
 import { setIndicatorState } from './indicator.js';
+import { getMaxScrollPct, startScrollTracking } from './scroll.js';
+import { startDwellTracking } from './dwell.js';
+import { startFormTracking } from './forms.js';
 
 const FLUSH_INTERVAL_MS = 2000;
 
-type PendingClickEvent = {
-  event_id: string;
-  type: 'click';
-  ts: number;
-  tz_offset: number;
-  url: string;
-  payload: {
-    selector_path: string;
-    tag: string;
-    role?: string;
-    aria_label?: string;
-    text_hash?: string;
-    x_pct: number;
-    y_pct: number;
-    is_trusted: boolean;
-  };
-};
-
 let consentState: ConsentState | null = null;
 let pageDenied = false;
-let buffer: PendingClickEvent[] = [];
+let buffer: PendingEvent[] = [];
 
-function canCaptureClicks(): boolean {
-  return consentState !== null && !pageDenied && hasScope(consentState, 'interaction');
+function canCapture(type: EventType): boolean {
+  return consentState !== null && !pageDenied && mayCapture(consentState, type);
+}
+
+function emitEvent(type: EventType, payload: Record<string, unknown>): void {
+  if (!canCapture(type)) {
+    return;
+  }
+  buffer.push({
+    event_id: ulid(),
+    type,
+    ts: Date.now(),
+    tz_offset: -new Date().getTimezoneOffset(),
+    url: location.href,
+    payload,
+  });
 }
 
 function updateIndicator(): void {
@@ -88,7 +89,7 @@ async function sha256Hex(text: string): Promise<string> {
 }
 
 async function handleClick(event: MouseEvent): Promise<void> {
-  if (!canCaptureClicks()) {
+  if (!canCapture('click')) {
     return;
   }
   const target = event.target;
@@ -98,22 +99,15 @@ async function handleClick(event: MouseEvent): Promise<void> {
   const text = target.textContent?.trim();
   const textHash = text ? await sha256Hex(text) : undefined;
 
-  buffer.push({
-    event_id: ulid(),
-    type: 'click',
-    ts: Date.now(),
-    tz_offset: -new Date().getTimezoneOffset(),
-    url: location.href,
-    payload: {
-      selector_path: buildSelectorPath(target),
-      tag: target.tagName.toLowerCase(),
-      role: target.getAttribute('role') ?? undefined,
-      aria_label: target.getAttribute('aria-label') ?? undefined,
-      text_hash: textHash,
-      x_pct: (event.clientX / window.innerWidth) * 100,
-      y_pct: (event.clientY / window.innerHeight) * 100,
-      is_trusted: event.isTrusted,
-    },
+  emitEvent('click', {
+    selector_path: buildSelectorPath(target),
+    tag: target.tagName.toLowerCase(),
+    role: target.getAttribute('role') ?? undefined,
+    aria_label: target.getAttribute('aria-label') ?? undefined,
+    text_hash: textHash,
+    x_pct: (event.clientX / window.innerWidth) * 100,
+    y_pct: (event.clientY / window.innerHeight) * 100,
+    is_trusted: event.isTrusted,
   });
 }
 
@@ -131,6 +125,10 @@ function flush(): void {
 document.addEventListener('click', (event) => {
   void handleClick(event);
 }, { capture: true });
+
+startScrollTracking((payload) => emitEvent('scroll', payload));
+startDwellTracking((payload) => emitEvent('page_view_end', payload), getMaxScrollPct);
+startFormTracking((payload) => emitEvent('input_focus', payload));
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
