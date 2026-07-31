@@ -4,3 +4,4 @@ export * from './errors.js';
 export * from './events.js';
 export * from './privacy.js';
 export * from './screenshots.js';
+export * from './settings.js';

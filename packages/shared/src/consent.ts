@@ -15,6 +15,8 @@ export const STORAGE_KEYS = {
   denyList: 'denyList',
   deviceId: 'deviceId',
   sessionSeq: 'sessionSeq',
+  privacySettings: 'privacySettings',
+  deliveryLog: 'deliveryLog',
 } as const;
 
 export const consentStateSchema = z.object({
