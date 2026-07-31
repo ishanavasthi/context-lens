@@ -8,13 +8,13 @@ export default defineManifest({
   permissions: ['tabs', 'storage', 'activeTab', 'scripting', 'alarms', 'idle', 'webNavigation'],
   host_permissions: ['<all_urls>'],
   background: {
-    service_worker: 'src/background/index.ts',
+    service_worker: 'src/background/service-worker.ts',
     type: 'module',
   },
   content_scripts: [
     {
       matches: ['<all_urls>'],
-      js: ['src/content/index.ts'],
+      js: ['src/content/content-script.ts'],
       run_at: 'document_idle',
     },
   ],

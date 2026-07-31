@@ -17,6 +17,7 @@ import type { Config } from './config.js';
 import { createLogger, type Logger } from './logger.js';
 import { deviceAuth, type AuthVariables } from './auth.js';
 import { insertEventsBatch, listEvents } from './repo/events.js';
+import { ensureSession } from './repo/sessions.js';
 import { decodeCursor, encodeCursor } from './cursor.js';
 
 type Variables = AuthVariables & {
@@ -68,6 +69,18 @@ export function createApp(
     const batch = eventBatchSchema.parse(body);
     const events = batch.events.map(parseEvent);
     const userId = c.get('userId');
+
+    // The device id is taken from the authenticated device, never from the body,
+    // so a client cannot attribute events to someone else's device.
+    const sessionStart = events.find((e) => e.type === 'session_start');
+    await ensureSession(pool, {
+      sessionId: batch.session_id,
+      deviceId: c.get('deviceId'),
+      userId,
+      consentScopes: (sessionStart?.payload as { consent_scopes?: string[] } | undefined)
+        ?.consent_scopes,
+    });
+
     const result = await insertEventsBatch(pool, userId, events);
     return c.json(eventBatchResultSchema.parse(result));
   });
@@ -123,7 +136,15 @@ export function createApp(
         : err instanceof ZodError
           ? new ApiError(ERROR_CODES.BAD_REQUEST, 'Invalid request body', err.issues)
           : new ApiError(ERROR_CODES.INTERNAL, 'Internal server error');
-    logger.error(apiError.message, { requestId, code: apiError.code });
+    // Log the underlying cause server side. The response body deliberately
+    // carries only the sanitised envelope, so without this an unexpected error
+    // is undiagnosable: all anyone sees is "Internal server error".
+    logger.error(apiError.message, {
+      requestId,
+      code: apiError.code,
+      cause: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
     return c.json(toErrorEnvelope(apiError, requestId), apiError.status as ContentfulStatusCode);
   });
 

@@ -7,6 +7,16 @@ import { loadConfig } from './config.js';
 import { createApp } from './app.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Load the repo root .env before reading config. Without this DATABASE_URL is
+// undefined and pg silently falls back to its own defaults (localhost:5432),
+// which surfaces much later as a connection refused on the first query rather
+// than as a configuration error at boot.
+try {
+  process.loadEnvFile(join(__dirname, '..', '..', '..', '.env'));
+} catch {
+  // No .env present. Real environments supply configuration directly.
+}
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8')) as {
   version: string;
 };

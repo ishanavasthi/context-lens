@@ -54,6 +54,33 @@ no advantage over npm at this size).
 Revisit when: the workspace exceeds roughly ten packages or install time becomes a complaint.
 Tier: Verified.
 
+## 2026-07-31: Ingest creates the session row on demand
+
+Why: the extension mints a session id when the service worker starts, and that worker can be
+terminated at any moment. If the sessions row were created only by a session_start event, losing
+that single event would make every later event in the session fail its foreign key forever, which
+converts one dropped message into a silently dead session. Ingest therefore upserts the session on
+every batch, taking the device id from the authenticated device rather than the request body so a
+client cannot attribute events to another device.
+Rejected: requiring session_start to arrive first (fragile in exactly the runtime this project is
+built around); dropping the foreign key (loses the guarantee that every event belongs to a real
+session).
+Revisit when: sessions grow attributes that genuinely cannot be defaulted at first sight.
+Tier: Verified, by the walking skeleton test which failed on the foreign key before this change and
+passes after it.
+
+## 2026-07-31: Extension entry files are named for their role, not index.ts
+
+Why: both entry points were originally src/background/index.ts and src/content/index.ts. CRXJS
+names emitted assets after the entry basename, so both produced index.ts-<hash>.js, and the
+generated service worker loader imported the content script bundle instead of the background one.
+The extension loaded and every unit test passed while the service worker was running the wrong
+code. Renaming to service-worker.ts and content-script.ts makes the emitted names unambiguous.
+Rejected: pinning output file names in the Vite config (works, but leaves the trap in place for the
+next entry point someone adds).
+Revisit when: never. Distinct entry names cost nothing.
+Tier: Verified, by inspecting the emitted loader before and after the rename.
+
 ## 2026-07-31: Accept five dev only audit advisories rather than break eslint
 
 Why: `npm audit` reports five high severity findings, all the same root cause, a denial of service
