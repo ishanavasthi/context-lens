@@ -13,6 +13,7 @@ import { isUrlDenied } from '../privacy/deny.js';
 import { applyBadge } from './badge.js';
 import { registerObservers } from './observers.js';
 import { deleteEvents, enqueueEvent, queueSize, readBatch } from './queue.js';
+import { captureAndUpload } from './screenshot.js';
 import { allocateEventIdentity, currentSessionId, getDeviceId } from './session.js';
 
 const ALARM_NAME = 'contextlens-flush';
@@ -121,6 +122,15 @@ onConsentChanged((state) => {
 });
 
 registerObservers();
+
+chrome.webNavigation.onCompleted.addListener((details) => {
+  if (details.frameId !== 0) return;
+  void captureAndUpload(details.tabId, 'navigation');
+});
+
+chrome.tabs.onActivated.addListener((activeInfo) => {
+  void captureAndUpload(activeInfo.tabId, 'tab_activated');
+});
 
 declare global {
   var __contextlens: {
