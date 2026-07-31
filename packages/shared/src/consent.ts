@@ -69,3 +69,33 @@ export const BADGE = {
   paused: { text: 'II', color: '#6B7280' },
   off: { text: '', color: '#6B7280' },
 } as const;
+
+/**
+ * Which consent scope authorises which event type. Capture code must consult this
+ * rather than deciding locally, otherwise the service worker and the content script
+ * can disagree about whether an event was permitted.
+ *
+ * Types with a null scope are lifecycle records, not user activity: they describe the
+ * capture system itself and are written whenever anything at all is being captured.
+ */
+export const SCOPE_FOR_EVENT: Record<string, ConsentScope | null> = {
+  session_start: null,
+  session_end: null,
+  consent_change: null,
+  idle_state_change: null,
+  navigation: 'navigation',
+  tab_activated: 'navigation',
+  page_view_end: 'dwell',
+  scroll: 'dwell',
+  click: 'interaction',
+  input_focus: 'interaction',
+  screenshot: 'screenshots',
+};
+
+/** True when the current consent permits recording this event type. */
+export function mayCapture(state: ConsentState, eventType: string): boolean {
+  if (!isCapturing(state)) return false;
+  const scope = SCOPE_FOR_EVENT[eventType];
+  if (scope === undefined) return false;
+  return scope === null ? true : state.granted.includes(scope);
+}
