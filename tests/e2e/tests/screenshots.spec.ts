@@ -1,6 +1,11 @@
 import { STORAGE_KEYS, SCREENSHOT_LIMITS, type ConsentState } from '@contextlens/shared';
 import { test, expect } from '../fixtures/extension.js';
 
+// The stored object is read back with the service role key, which continuous integration
+// does not have. Skip there rather than fail, and let the runner report the skip so the
+// gap stays visible.
+const STORAGE_CONFIGURED = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+
 /**
  * Screenshot capture, verified by pixels rather than by the absence of an error.
  *
@@ -58,6 +63,9 @@ test('a captured screenshot stores the pixels the page actually rendered', async
   context,
   serviceWorker,
 }) => {
+  // Only this test reads the stored object back, so only this one needs credentials.
+  // The scope check below runs everywhere.
+  test.skip(!STORAGE_CONFIGURED, 'object storage is not configured');
   await grantScreenshots(serviceWorker as never);
 
   const page = await context.newPage();
