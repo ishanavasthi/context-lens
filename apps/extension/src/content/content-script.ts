@@ -16,6 +16,10 @@ import { startFormTracking } from './forms.js';
 
 const FLUSH_INTERVAL_MS = 2000;
 
+// Started before any listener is registered, so a click can never observe an
+// unassigned readiness promise. init is a function declaration and therefore hoisted.
+const ready: Promise<void> = init();
+
 let consentState: ConsentState | null = null;
 let pageDenied = false;
 let buffer: PendingEvent[] = [];
@@ -89,25 +93,35 @@ async function sha256Hex(text: string): Promise<string> {
 }
 
 async function handleClick(event: MouseEvent): Promise<void> {
-  if (!canCapture('click')) {
-    return;
-  }
   const target = event.target;
   if (!(target instanceof Element)) {
     return;
   }
-  const text = target.textContent?.trim();
-  const textHash = text ? await sha256Hex(text) : undefined;
 
-  emitEvent('click', {
+  // Read everything off the event synchronously. Consent and deny state are loaded
+  // asynchronously, and a click that arrives before that finishes was previously
+  // dropped in silence, which loses real events on a fast page. Snapshot first,
+  // then wait, then decide.
+  const snapshot = {
     selector_path: buildSelectorPath(target),
     tag: target.tagName.toLowerCase(),
     role: target.getAttribute('role') ?? undefined,
     aria_label: target.getAttribute('aria-label') ?? undefined,
-    text_hash: textHash,
+    text: target.textContent?.trim(),
     x_pct: (event.clientX / window.innerWidth) * 100,
     y_pct: (event.clientY / window.innerHeight) * 100,
     is_trusted: event.isTrusted,
+  };
+
+  await ready;
+  if (!canCapture('click')) {
+    return;
+  }
+
+  const { text, ...rest } = snapshot;
+  emitEvent('click', {
+    ...rest,
+    text_hash: text ? await sha256Hex(text) : undefined,
   });
 }
 
@@ -151,4 +165,4 @@ onConsentChanged((state) => {
   updateIndicator();
 });
 
-void init();
+void ready;

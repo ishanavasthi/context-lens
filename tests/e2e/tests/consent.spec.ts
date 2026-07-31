@@ -125,6 +125,24 @@ test('on a denied host, no indicator is present and no events are queued even wi
   await page.click('[data-testid="click-target"]');
   await page.waitForTimeout(3_000);
 
-  const queued = await serviceWorker.evaluate(() => globalThis.__contextlens.queueSize());
-  expect(queued).toBe(0);
+  // Assert on what was recorded, not on a raw count. A consent_change audit record
+  // legitimately exists here: it carries no URL and nothing about the denied page,
+  // and suppressing it would remove the trail showing consent was ever granted.
+  // What must never appear is any record of activity on the denied host.
+  const queued = await serviceWorker.evaluate(async () => {
+    const db: IDBDatabase = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('contextlens');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    return await new Promise<Array<{ type: string; url?: string }>>((resolve, reject) => {
+      const all = db.transaction('events', 'readonly').objectStore('events').getAll();
+      all.onsuccess = () => resolve(all.result as Array<{ type: string; url?: string }>);
+      all.onerror = () => reject(all.error);
+    });
+  });
+
+  expect(queued.filter((event) => event.url?.includes('localhost'))).toEqual([]);
+  expect(queued.filter((event) => event.type === 'click')).toEqual([]);
+  expect(queued.every((event) => event.url === undefined)).toBe(true);
 });

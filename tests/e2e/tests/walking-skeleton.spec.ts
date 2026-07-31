@@ -52,13 +52,23 @@ test('a click travels from the page to Postgres and back out through the API', a
   await page.goto(FIXTURE, { waitUntil: 'load' });
   await page.click('[data-testid="click-target"]');
 
-  // The content script buffers and flushes to the service worker on a 2 second
-  // timer, so wait for the event to reach the durable queue before forcing the
-  // network flush.
+  // Wait for THIS event, not merely for the queue to be non empty. Lifecycle records
+  // such as consent_change arrive first, so a size based gate would let the flush run
+  // before the click has been buffered and the test would flush the wrong thing.
   await expect
-    .poll(async () => serviceWorker.evaluate(() => globalThis.__contextlens.queueSize()), {
-      timeout: 15_000,
-    })
+    .poll(async () => serviceWorker.evaluate(async () => {
+        const db: IDBDatabase = await new Promise((resolve, reject) => {
+          const request = indexedDB.open('contextlens');
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        const rows = await new Promise<Array<{ type: string }>>((resolve, reject) => {
+          const all = db.transaction('events', 'readonly').objectStore('events').getAll();
+          all.onsuccess = () => resolve(all.result as Array<{ type: string }>);
+          all.onerror = () => reject(all.error);
+        });
+        return rows.filter((row) => row.type === 'click').length;
+      }), { timeout: 15_000 })
     .toBeGreaterThan(0);
 
   await serviceWorker.evaluate(() => globalThis.__contextlens.flushNow());

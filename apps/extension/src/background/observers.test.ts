@@ -124,6 +124,43 @@ describe('registerObservers', () => {
     expect(batch.some((event) => event.url === 'https://accounts.google.com/signin')).toBe(false);
   });
 
+  it('records a single page route change as a navigation, flagged as spa', async () => {
+    // Most navigation on modern sites never commits a document load, so watching
+    // only onCommitted would miss the majority of it.
+    await setup(['navigation']);
+    onHistoryStateUpdated({
+      tabId: 1,
+      frameId: 0,
+      url: 'https://example.com/spa/route',
+      transitionType: 'link',
+      timeStamp: 0,
+    } as chrome.webNavigation.WebNavigationTransitionCallbackDetails);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const batch = await readBatch(10);
+    const nav = batch.find((event) => event.url === 'https://example.com/spa/route');
+    expect(nav?.type).toBe('navigation');
+    expect((nav?.payload as { is_spa?: boolean }).is_spa).toBe(true);
+  });
+
+  it('enqueues a tab activation under the navigation scope', async () => {
+    await setup(['navigation']);
+    onTabActivated({ tabId: 7, windowId: 3 } as chrome.tabs.TabActiveInfo);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const batch = await readBatch(10);
+    expect(batch.some((event) => event.type === 'tab_activated')).toBe(true);
+  });
+
+  it('does not enqueue a tab activation without the navigation scope', async () => {
+    await setup(['interaction']);
+    onTabActivated({ tabId: 7, windowId: 3 } as chrome.tabs.TabActiveInfo);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const batch = await readBatch(10);
+    expect(batch.some((event) => event.type === 'tab_activated')).toBe(false);
+  });
+
   it('enqueues a lifecycle event with any scope granted', async () => {
     await setup(['interaction']);
     onIdleStateChanged('idle');
