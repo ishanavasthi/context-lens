@@ -54,6 +54,24 @@ function render(app: HTMLElement, state: ConsentState): void {
     chrome.runtime.openOptionsPage();
   });
   app.appendChild(optionsButton);
+
+  // Both of these pages are web accessible resources, which means nothing links to them
+  // by default and a user would have to construct an extension URL by hand. A view of
+  // your own data that cannot be opened is not a view of your own data.
+  const pages: Array<{ testid: string; label: string; path: string }> = [
+    { testid: 'popup-open-timeline', label: 'Timeline', path: 'src/timeline/index.html' },
+    { testid: 'popup-open-transparency', label: 'What was sent', path: 'src/transparency/index.html' },
+  ];
+  for (const page of pages) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute('data-testid', page.testid);
+    button.textContent = page.label;
+    button.addEventListener('click', () => {
+      void chrome.tabs.create({ url: chrome.runtime.getURL(page.path) });
+    });
+    app.appendChild(button);
+  }
 }
 
 async function init(): Promise<void> {
