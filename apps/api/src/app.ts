@@ -15,6 +15,7 @@ import {
   screenshotSignRequestSchema,
   screenshotSignResponseSchema,
   SCREENSHOT_BUCKET,
+  summaryResponseSchema,
   toErrorEnvelope,
 } from '@contextlens/shared';
 import type { Config } from './config.js';
@@ -30,6 +31,7 @@ import {
   iterateSessions,
 } from './repo/privacy.js';
 import { insertScreenshot } from './repo/screenshots.js';
+import { getSummary } from './repo/summary.js';
 import { ensureSession } from './repo/sessions.js';
 import { decodeCursor, encodeCursor } from './cursor.js';
 
@@ -272,6 +274,20 @@ export function createApp(
     });
 
     return c.json({ ok: true as const });
+  });
+
+  app.get(ROUTES.summary, deviceAuth(pool), async (c) => {
+    const userId = c.get('userId');
+    const query = c.req.query();
+
+    const from = query.from ? new Date(query.from) : undefined;
+    const to = query.to ? new Date(query.to) : undefined;
+    if ((from && Number.isNaN(from.getTime())) || (to && Number.isNaN(to.getTime()))) {
+      throw new ApiError(ERROR_CODES.BAD_REQUEST, 'from and to must be valid timestamps');
+    }
+
+    const summary = await getSummary(pool, { userId, from, to });
+    return c.json(summaryResponseSchema.parse(summary));
   });
 
   app.notFound((c) => {
