@@ -6,15 +6,19 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@contextlens/shared": "*"
+    "@contextlens/shared": "*",
+    "ulid": "^3.0.2"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "^2.7.1",
     "@types/chrome": "^0.0.287",
+    "fake-indexeddb": "^6.2.5",
     "typescript": "^5.7.2",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "vitest": "^2.1.8"
   }
 }
