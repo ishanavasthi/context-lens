@@ -10,8 +10,7 @@ import {
 import { onConsentChanged, readConsent } from '../consent/store.js';
 import { isUrlDenied } from '../privacy/deny.js';
 import { enqueueEvent } from './queue.js';
-import { getDeviceId, nextSeq } from './session.js';
-import { sessionId } from './service-worker.js';
+import { allocateEventIdentity, getDeviceId } from './session.js';
 
 async function getTabTitle(tabId: number): Promise<string | undefined> {
   try {
@@ -34,7 +33,7 @@ async function tryEmit(
     const parsed = eventPayloadSchemas[type].safeParse(payload);
     if (!parsed.success) return;
     const deviceId = await getDeviceId();
-    const seq = await nextSeq();
+    const { sessionId, seq } = await allocateEventIdentity();
     const envelope: EventEnvelope = {
       event_id: ulid(),
       session_id: sessionId,

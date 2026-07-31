@@ -13,14 +13,14 @@ import { isUrlDenied } from '../privacy/deny.js';
 import { applyBadge } from './badge.js';
 import { registerObservers } from './observers.js';
 import { deleteEvents, enqueueEvent, queueSize, readBatch } from './queue.js';
-import { createSessionId, getDeviceId, nextSeq } from './session.js';
+import { allocateEventIdentity, currentSessionId, getDeviceId } from './session.js';
 
 const ALARM_NAME = 'contextlens-flush';
 const FLUSH_QUEUE_THRESHOLD = 20;
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
 const DEVICE_TOKEN = import.meta.env.VITE_DEV_DEVICE_TOKEN;
 
-export const sessionId = createSessionId();
+
 
 async function enqueueIncomingEvents(
   events: PendingEvent[],
@@ -37,7 +37,7 @@ async function enqueueIncomingEvents(
     if (!parsedPayload.success) {
       continue;
     }
-    const seq = await nextSeq();
+    const { sessionId, seq } = await allocateEventIdentity();
     const envelope: EventEnvelope = {
       event_id: incoming.event_id,
       session_id: sessionId,
@@ -71,7 +71,7 @@ async function flush(): Promise<void> {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${DEVICE_TOKEN}`,
       },
-      body: JSON.stringify({ device_id: deviceId, session_id: sessionId, events: batch }),
+      body: JSON.stringify({ device_id: deviceId, session_id: await currentSessionId(), events: batch }),
     });
     if (response.ok) {
       await deleteEvents(batch.map((event) => event.event_id));

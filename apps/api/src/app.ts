@@ -70,16 +70,24 @@ export function createApp(
     const events = batch.events.map(parseEvent);
     const userId = c.get('userId');
 
-    // The device id is taken from the authenticated device, never from the body,
-    // so a client cannot attribute events to someone else's device.
-    const sessionStart = events.find((e) => e.type === 'session_start');
-    await ensureSession(pool, {
-      sessionId: batch.session_id,
-      deviceId: c.get('deviceId'),
-      userId,
-      consentScopes: (sessionStart?.payload as { consent_scopes?: string[] } | undefined)
-        ?.consent_scopes,
-    });
+    // Ensure every session referenced anywhere in the batch, not just the one named on
+    // the envelope. A batch is drained from a durable queue that can outlive a session
+    // boundary, so it may legitimately carry events from more than one. Ensuring only
+    // the envelope's session would leave the rest failing their foreign key.
+    //
+    // The device id comes from the authenticated device, never from the body, so a
+    // client cannot attribute events to someone else's device.
+    const deviceId = c.get('deviceId');
+    const sessionIds = new Set<string>([batch.session_id, ...events.map((e) => e.session_id)]);
+    for (const sessionId of sessionIds) {
+      const start = events.find((e) => e.session_id === sessionId && e.type === 'session_start');
+      await ensureSession(pool, {
+        sessionId,
+        deviceId,
+        userId,
+        consentScopes: (start?.payload as { consent_scopes?: string[] } | undefined)?.consent_scopes,
+      });
+    }
 
     const result = await insertEventsBatch(pool, userId, events);
     return c.json(eventBatchResultSchema.parse(result));
