@@ -1,4 +1,5 @@
 import js from '@eslint/js';
+import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -15,6 +16,10 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    // Default runtime is Node. The extension overrides this below.
+    languageOptions: {
+      globals: { ...globals.node },
+    },
     rules: {
       '@typescript-eslint/no-unused-vars': [
         'error',
@@ -22,6 +27,13 @@ export default tseslint.config(
       ],
       '@typescript-eslint/consistent-type-imports': 'error',
       'no-console': 'off',
+    },
+  },
+  {
+    // Extension code runs in the browser and against the chrome extension API.
+    files: ['apps/extension/**/*.{ts,js}'],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.webextensions, chrome: 'readonly' },
     },
   },
   {
