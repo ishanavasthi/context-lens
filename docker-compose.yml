@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: contextlens-db
+    environment:
+      POSTGRES_USER: contextlens
+      POSTGRES_PASSWORD: contextlens
+      POSTGRES_DB: contextlens
+    ports:
+      - '54329:5432'
+    volumes:
+      - contextlens-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U contextlens -d contextlens']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  contextlens-db-data:
