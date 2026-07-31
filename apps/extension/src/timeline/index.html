@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ContextLens Timeline</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        color: #1a1a1a;
+      }
+      h1 {
+        font-size: 1.4rem;
+      }
+      h2 {
+        font-size: 1.1rem;
+      }
+      section {
+        margin-bottom: 1.5rem;
+      }
+      .totals {
+        display: flex;
+        gap: 1.5rem;
+      }
+      .totals .stat {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 0.75rem 1rem;
+        text-align: center;
+      }
+      .totals .stat .value {
+        font-size: 1.3rem;
+        font-weight: 600;
+        display: block;
+      }
+      .totals .stat .label {
+        font-size: 0.8rem;
+        color: #555;
+      }
+      .range-control {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+      .range-control button {
+        border: 1px solid #ddd;
+        background: #fff;
+        border-radius: 6px;
+        padding: 0.4rem 0.8rem;
+        cursor: pointer;
+      }
+      .range-control button.active {
+        background: #1a1a1a;
+        color: #fff;
+        border-color: #1a1a1a;
+      }
+      .domain-row {
+        display: grid;
+        grid-template-columns: 10rem 1fr 5rem;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.4rem;
+      }
+      .domain-row .host {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.9rem;
+      }
+      .domain-row .bar-track {
+        background: #f0f0f0;
+        border-radius: 4px;
+        height: 0.9rem;
+        overflow: hidden;
+      }
+      .domain-row .bar-fill {
+        background: #2563eb;
+        height: 100%;
+      }
+      .domain-row .duration {
+        font-size: 0.85rem;
+        color: #444;
+        text-align: right;
+      }
+      .event-row {
+        display: grid;
+        grid-template-columns: 9rem 10rem 1fr;
+        gap: 0.75rem;
+        padding: 0.4rem 0;
+        border-bottom: 1px solid #eee;
+        font-size: 0.9rem;
+      }
+      .event-row .time {
+        color: #555;
+      }
+      .empty-state,
+      .error-state {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 1rem;
+        background: #f9fafb;
+      }
+      .error-state {
+        border-color: #b91c1c;
+        background: #fef2f2;
+      }
+      .error-state button {
+        margin-top: 0.5rem;
+      }
+      .loading-state {
+        color: #555;
+      }
+      .load-more {
+        margin-top: 0.5rem;
+        border: 1px solid #ddd;
+        background: #fff;
+        border-radius: 6px;
+        padding: 0.4rem 0.8rem;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="app" data-testid="timeline-root"></main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
