@@ -3,12 +3,69 @@
   <head>
     <meta charset="UTF-8" />
     <title>ContextLens Options</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        color: #1a1a1a;
+      }
+      h1 {
+        font-size: 1.4rem;
+      }
+      section {
+        margin-bottom: 1.5rem;
+      }
+      .scope-card {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+      }
+      .scope-card.second-opt-in {
+        border-color: #b45309;
+        background: #fffbeb;
+      }
+      .scope-card h3 {
+        margin: 0 0 0.25rem 0;
+      }
+      .scope-card pre {
+        background: #f4f4f4;
+        padding: 0.5rem;
+        overflow-x: auto;
+        font-size: 0.8rem;
+      }
+      .never-collected {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 1rem;
+        background: #f9fafb;
+      }
+      textarea {
+        width: 100%;
+        min-height: 8rem;
+        font-family: monospace;
+      }
+      .actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+      }
+      label.checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+      }
+      .hint {
+        color: #555;
+        font-size: 0.85rem;
+      }
+    </style>
   </head>
   <body>
-    <main>
-      <h1>ContextLens Options</h1>
-      <p>Options placeholder.</p>
-    </main>
+    <main id="app"></main>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>
