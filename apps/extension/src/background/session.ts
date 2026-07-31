@@ -47,8 +47,33 @@ function isUsable(value: unknown): value is StoredSession {
  * That pairing is what lets a gap in the sequence mean an event was lost, which is the
  * only signal available for detecting drops caused by worker termination.
  */
-export async function allocateEventIdentity(
+/**
+ * Serialises allocation.
+ *
+ * The body reads the counter, awaits, then writes it back. Two calls that interleave at
+ * that await both read the same value and both write the same successor, handing out a
+ * duplicate. It is not hypothetical: a real browsing session produced 228 events with
+ * only 223 distinct sequence numbers, because a click, a navigation and a scroll can be
+ * allocated concurrently. A duplicate is worse than a gap, since gap detection is the
+ * only signal for events lost to worker termination and reuse quietly corrupts it.
+ *
+ * A promise chain is sufficient because the worker is single threaded and only one
+ * instance runs at a time, so there is no cross instance race to guard against.
+ */
+let allocationChain: Promise<unknown> = Promise.resolve();
+
+export function allocateEventIdentity(
   now: number = Date.now(),
+): Promise<{ sessionId: string; seq: number }> {
+  const next = allocationChain.then(() => allocateExclusively(now));
+  // Keep the chain alive even if one allocation rejects, otherwise a single failure
+  // would wedge every later allocation behind a rejected promise.
+  allocationChain = next.catch(() => undefined);
+  return next;
+}
+
+async function allocateExclusively(
+  now: number,
 ): Promise<{ sessionId: string; seq: number }> {
   const stored = (await chrome.storage.local.get(SESSION_KEY))[SESSION_KEY];
   const previous = isUsable(stored) ? stored : null;

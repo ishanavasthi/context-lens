@@ -1,6 +1,7 @@
 import { ulid } from 'ulid';
 import {
   CONTENT_EVENTS_MESSAGE,
+  SENSITIVE_PAGE_MESSAGE,
   mayCapture,
   isCapturing,
   type ConsentState,
@@ -166,3 +167,22 @@ onConsentChanged((state) => {
 });
 
 void ready;
+
+
+/**
+ * Tells the worker whether this page is presenting a credential prompt, so screenshots
+ * can be suppressed regardless of host. Login forms frequently render after first paint,
+ * so this is re-evaluated on DOM changes rather than checked once.
+ */
+function reportSensitivity(): void {
+  const hasPasswordField = document.querySelector('input[type="password"]') !== null;
+  chrome.runtime.sendMessage({ type: SENSITIVE_PAGE_MESSAGE, sensitive: hasPasswordField }).catch(() => {
+    // The worker may be starting up. The next observer tick reports again.
+  });
+}
+
+reportSensitivity();
+new MutationObserver(() => reportSensitivity()).observe(document.documentElement, {
+  subtree: true,
+  childList: true,
+});

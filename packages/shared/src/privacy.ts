@@ -22,14 +22,37 @@ export const DEFAULT_DENY_PATTERNS: readonly string[] = [
   '*.paypal.com',
   'stripe.com',
   '*.stripe.com',
-  // Identity providers and password managers, where a capture could catch a login
+  // Identity providers and password managers, where a capture could catch a login.
+  // This list can only ever block what someone thought to name: login.live.com was
+  // missing while login.microsoftonline.com was present, and a real sign in page was
+  // captured as a result. The password field check in the extension is the general
+  // defence; these entries are the cheap specific one.
   'accounts.google.com',
   'login.microsoftonline.com',
+  'login.live.com',
+  '*.live.com',
   'appleid.apple.com',
+  'signin.aws.amazon.com',
+  'id.atlassian.com',
+  '*.okta.com',
+  '*.auth0.com',
+  '*.onelogin.com',
+  '*.duosecurity.com',
   '*.1password.com',
   '*.bitwarden.com',
   '*.lastpass.com',
+  '*.dashlane.com',
 ] as const;
+
+/**
+ * Message sent by a content script when it detects that the page contains a password
+ * field. A host list cannot enumerate every sign in page in existence, so capture is
+ * additionally suppressed on any page actually presenting a credential prompt.
+ */
+export const SENSITIVE_PAGE_MESSAGE = 'contextlens:sensitive-page';
+
+/** Where the worker records which tabs are currently showing a credential prompt. */
+export const SENSITIVE_TABS_KEY = 'sensitiveTabs';
 
 /** True when the host matches a single pattern. */
 export function hostMatchesPattern(host: string, pattern: string): boolean {

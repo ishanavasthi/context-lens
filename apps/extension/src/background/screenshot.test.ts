@@ -23,15 +23,18 @@ function stubChrome(opts: {
   granted: ConsentState['granted'];
   tabUrl?: string;
   captureVisibleTab?: ReturnType<typeof vi.fn>;
+  sensitiveTabs?: Record<string, boolean>;
 }) {
   const local = makeStorageStub();
+  const session = makeStorageStub();
+  if (opts.sensitiveTabs) session._setRaw('sensitiveTabs', opts.sensitiveTabs);
   local._setRaw(STORAGE_KEYS.consent, consentState({ granted: opts.granted }));
   const captureVisibleTab =
     opts.captureVisibleTab ?? vi.fn().mockResolvedValue('data:image/png;base64,AAAA');
   const tabsGet = vi.fn().mockResolvedValue({ url: opts.tabUrl ?? 'https://example.com/page' });
   vi.stubGlobal('chrome', {
-    storage: { local },
-    tabs: { get: tabsGet, captureVisibleTab },
+    storage: { local, session },
+    tabs: { get: tabsGet, captureVisibleTab, onRemoved: { addListener: vi.fn() } },
   });
   return { captureVisibleTab, tabsGet };
 }
@@ -178,5 +181,42 @@ describe('throttle budget', () => {
     stubChrome({ granted: ['navigation', 'screenshots'], tabUrl: 'https://example.com/page' });
     const second = await import('./screenshot.js');
     expect(second).toBeDefined();
+  });
+});
+
+
+describe('credential prompts', () => {
+  it('refuses to capture a page presenting a password field, whatever its host', async () => {
+    // The deny list can only block hosts somebody named, and it missed login.live.com
+    // while listing login.microsoftonline.com. This check keys on what the page is
+    // actually showing, so an unlisted sign in page is still refused.
+    const captureVisibleTab = vi.fn();
+    stubChrome({
+      granted: ['navigation', 'screenshots'],
+      tabUrl: 'https://an-unlisted-sign-in-page.example/login',
+      captureVisibleTab,
+      sensitiveTabs: { '1': true },
+    });
+
+    const { captureAndUpload } = await import('./screenshot.js');
+    expect(await captureAndUpload(1, 'navigation')).toBeNull();
+    expect(captureVisibleTab).not.toHaveBeenCalled();
+  });
+
+  it('captures the same host once the credential prompt is gone', async () => {
+    const captureVisibleTab = vi.fn().mockResolvedValue('data:image/png;base64,AAAA');
+    stubChrome({
+      granted: ['navigation', 'screenshots'],
+      tabUrl: 'https://an-unlisted-sign-in-page.example/home',
+      captureVisibleTab,
+      sensitiveTabs: {},
+    });
+
+    const { captureAndUpload } = await import('./screenshot.js');
+    // The rest of the pipeline is not stubbed here and will reject. That is fine: this
+    // test only asserts the guards were passed, which is exactly the point of contrast
+    // with the refusal above.
+    await captureAndUpload(1, 'navigation').catch(() => undefined);
+    expect(captureVisibleTab).toHaveBeenCalled();
   });
 });

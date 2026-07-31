@@ -10,6 +10,7 @@ import {
 } from '@contextlens/shared';
 import { readConsent } from '../consent/store.js';
 import { isUrlDenied } from '../privacy/deny.js';
+import { isTabSensitive } from './sensitive-tabs.js';
 import { enqueueEvent } from './queue.js';
 import { allocateEventIdentity, getDeviceId } from './session.js';
 
@@ -38,6 +39,11 @@ export async function captureAndUpload(tabId: number, trigger: string): Promise<
   // actually navigated to.
   if (!url || !/^https?:\/\//i.test(url)) return null;
   if (await isUrlDenied(url)) return null;
+
+  // A host list can only block what someone thought to name. Refuse any page actually
+  // presenting a credential prompt, whatever its host. Checked before the throttle so a
+  // refusal does not spend the interval budget.
+  if (await isTabSensitive(tabId)) return null;
 
   const now = Date.now();
   if (now - lastCaptureAt < SCREENSHOT_LIMITS.minIntervalMs) return null;

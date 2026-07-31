@@ -1,5 +1,6 @@
 import {
   CONTENT_EVENTS_MESSAGE,
+  SENSITIVE_PAGE_MESSAGE,
   eventPayloadSchemas,
   isCapturing,
   MAX_EVENTS_PER_BATCH,
@@ -12,6 +13,7 @@ import { onConsentChanged, readConsent } from '../consent/store.js';
 import { isUrlDenied } from '../privacy/deny.js';
 import { readPrivacySettings } from '../privacy/settings.js';
 import { applyBadge } from './badge.js';
+import { forgetTab, markTabSensitive } from './sensitive-tabs.js';
 import { appendDelivery } from './delivery-log.js';
 import { registerObservers } from './observers.js';
 import { deleteEvents, enqueueEvent, queueSize, readBatch } from './queue.js';
@@ -108,6 +110,15 @@ async function flush(): Promise<void> {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === SENSITIVE_PAGE_MESSAGE) {
+    const tabId = sender.tab?.id;
+    if (typeof tabId === 'number') {
+      void markTabSensitive(tabId, message.sensitive === true);
+    }
+    sendResponse({ ok: true });
+    return true;
+  }
+
   if (message?.type !== CONTENT_EVENTS_MESSAGE) {
     return undefined;
   }
@@ -172,3 +183,10 @@ globalThis.__contextlens = {
   queueSize,
   flushNow: flush,
 };
+
+
+// A tab that closes cannot still be showing a prompt, and leaving the flag set would
+// suppress captures for whatever tab id the browser reuses next.
+chrome.tabs.onRemoved.addListener((tabId) => {
+  void forgetTab(tabId);
+});

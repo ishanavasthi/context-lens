@@ -45,6 +45,7 @@ async function setup(granted: ConsentState['granted']) {
     },
     tabs: {
       onActivated: { addListener: vi.fn((cb) => (onTabActivated = cb)) },
+      onRemoved: { addListener: vi.fn() },
       get: vi.fn().mockResolvedValue({ title: 'Example page' }),
     },
     runtime: {

@@ -72,7 +72,11 @@ function stubServiceWorkerChrome(opts: { localOnly: boolean }) {
     runtime: { onMessage: listenable(), onInstalled: listenable(), onStartup: listenable(), onSuspend: listenable() },
     alarms: { onAlarm: listenable(), create: vi.fn() },
     webNavigation: { onCompleted: listenable(), onCommitted: listenable(), onHistoryStateUpdated: listenable() },
-    tabs: { onActivated: listenable(), get: vi.fn().mockResolvedValue({ title: 'Test Tab' }) },
+    tabs: {
+      onActivated: listenable(),
+      onRemoved: listenable(),
+      get: vi.fn().mockResolvedValue({ title: 'Test Tab' }),
+    },
     idle: { setDetectionInterval: vi.fn(), onStateChanged: listenable() },
     action: {
       setBadgeText: vi.fn().mockResolvedValue(undefined),
