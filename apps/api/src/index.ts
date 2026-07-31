@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { serve } from '@hono/node-server';
+import { Pool } from 'pg';
 import { loadConfig } from './config.js';
 import { createApp } from './app.js';
 
@@ -11,7 +12,8 @@ const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-
 };
 
 const config = loadConfig();
-const app = createApp(config, pkg.version);
+const pool = new Pool({ connectionString: config.DATABASE_URL });
+const app = createApp(config, pkg.version, pool);
 
 serve({ fetch: app.fetch, port: config.PORT }, (info) => {
   console.log(

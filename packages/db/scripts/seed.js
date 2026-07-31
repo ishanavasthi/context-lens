@@ -20,10 +20,11 @@ const USERS = [
 
 const DEVICES = [
   {
-    device_id: '00000000-0000-0000-0000-0000000000a1',
+    device_id: '00000000-0000-4000-8000-000000000001',
     user_id: USERS[0].user_id,
     user_agent: 'Mozilla/5.0 (Macintosh) Chrome/128.0',
     platform: 'macOS',
+    token_hash: createHash('sha256').update('dev-device-token-0000000000000000').digest(),
   },
   {
     device_id: '00000000-0000-0000-0000-0000000000a2',
@@ -209,9 +210,10 @@ async function main() {
 
     for (const device of DEVICES) {
       await client.query(
-        `insert into devices (device_id, user_id, user_agent, platform)
-         values ($1, $2, $3, $4) on conflict (device_id) do nothing`,
-        [device.device_id, device.user_id, device.user_agent, device.platform],
+        `insert into devices (device_id, user_id, user_agent, platform, token_hash)
+         values ($1, $2, $3, $4, $5)
+         on conflict (device_id) do update set token_hash = excluded.token_hash`,
+        [device.device_id, device.user_id, device.user_agent, device.platform, device.token_hash ?? null],
       );
     }
 
